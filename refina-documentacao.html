@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REFINA — Orquestrador de Entrega de História</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --surface-2: #1e222a;
+    --border: #2a2e37;
+    --text: #e8e6e1;
+    --text-dim: #9aa1ad;
+    --text-faint: #656d7a;
+    --accent: #ec7000;
+    --accent-dim: #a85419;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --fail: #f87171;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+
+  ::selection { background: var(--accent); color: #0f1115; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code, .mono { font-family: var(--mono); }
+
+  /* ---------- Layout shell ---------- */
+  .shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    nav.toc { display: none; }
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 40px 20px;
+    border-right: 1px solid var(--border);
+  }
+
+  nav.toc .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 14px;
+  }
+
+  nav.toc ul { list-style: none; }
+  nav.toc li { margin-bottom: 2px; }
+  nav.toc a {
+    display: block;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border-left: 2px solid transparent;
+  }
+  nav.toc a:hover {
+    color: var(--text);
+    text-decoration: none;
+    background: var(--surface);
+    border-left-color: var(--accent-dim);
+  }
+
+  main { padding: 0 40px 120px; }
+
+  @media (max-width: 860px) {
+    main { padding: 0 20px 80px; }
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    padding: 90px 0 50px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 22px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: clamp(32px, 5vw, 52px);
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    color: var(--text);
+    margin-bottom: 18px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    font-size: 18px;
+    color: var(--text-dim);
+    max-width: 640px;
+    margin-bottom: 34px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 4px;
+  }
+
+  .chip b { color: var(--text); font-weight: 600; }
+
+  /* ---------- Sections ---------- */
+  section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+
+  .section-num {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent-dim);
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 28px 0 10px;
+  }
+
+  p { color: var(--text-dim); margin-bottom: 14px; max-width: 720px; }
+  p code { color: var(--accent); background: var(--surface); padding: 1px 6px; border-radius: 3px; font-size: 0.88em; }
+
+  ul.plain { margin: 12px 0 20px 0; max-width: 720px; }
+  ul.plain li {
+    color: var(--text-dim);
+    list-style: none;
+    padding-left: 22px;
+    position: relative;
+    margin-bottom: 10px;
+  }
+  ul.plain li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--accent-dim);
+  }
+  ul.plain li b { color: var(--text); font-weight: 600; }
+
+  /* ---------- Diagram ---------- */
+  .diagram-frame {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 20px;
+    margin-top: 8px;
+    overflow-x: auto;
+  }
+
+  /* ---------- Phase cards ---------- */
+  .phase {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 18px;
+    padding: 22px 0;
+    border-top: 1px solid var(--border);
+  }
+  .phase:first-of-type { border-top: none; }
+
+  .phase-num {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-dim);
+  }
+
+  .phase-title {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+    font-size: 16px;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .tag.checkpoint { background: rgba(251,191,36,0.12); color: var(--warn); border: 1px solid rgba(251,191,36,0.3); }
+  .tag.auto { background: rgba(74,222,128,0.1); color: var(--ok); border: 1px solid rgba(74,222,128,0.25); }
+
+  /* ---------- Gates table ---------- */
+  table {
+    width: 100%;
+    max-width: 760px;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+  }
+  td { color: var(--text-dim); }
+  td.owner { color: var(--accent); font-family: var(--mono); font-size: 13px; }
+
+  /* ---------- File tree ---------- */
+  .tree {
+    font-family: var(--mono);
+    font-size: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    color: var(--text-dim);
+    max-width: 520px;
+    line-height: 1.9;
+    white-space: pre;
+  }
+  .tree .f { color: var(--text); }
+  .tree .c { color: var(--text-faint); }
+
+  /* ---------- Callout ---------- */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    border-radius: 0 6px 6px 0;
+    max-width: 720px;
+    margin: 20px 0;
+  }
+  .callout p { margin-bottom: 0; color: var(--text-dim); font-size: 14.5px; }
+  .callout p b { color: var(--text); }
+
+  footer {
+    padding: 40px 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <nav class="toc">
+    <div class="label">REFINA v1.0</div>
+    <ul>
+      <li><a href="#visao-geral">Visão geral</a></li>
+      <li><a href="#diagrama">Diagrama do loop</a></li>
+      <li><a href="#fases">As 6 fases</a></li>
+      <li><a href="#gates">Gates de DoR</a></li>
+      <li><a href="#qualidade">Qualidade & Teste</a></li>
+      <li><a href="#padroes">Padrões técnicos</a></li>
+      <li><a href="#arquivos">Estrutura de arquivos</a></li>
+      <li><a href="#instalacao">Instalação</a></li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <div class="hero">
+      <div class="eyebrow">Harness Engineering</div>
+      <h1>REF<span>INA</span></h1>
+      <p class="subtitle">
+        Orquestrador de entrega de história de usuário. Valida, especifica
+        via OpenSpec, decide abordagem técnica junto ao engenheiro, delega
+        implementação e revisa — em loop — até a entrega estar pronta.
+      </p>
+      <div class="meta-row">
+        <span class="chip">versão <b>1.0</b></span>
+        <span class="chip">runtime <b>Claude Code subagent</b></span>
+        <span class="chip">arquivos <b>2</b></span>
+        <span class="chip">especificação <b>OpenSpec</b></span>
+      </div>
+    </div>
+
+    <section id="visao-geral">
+      <div class="section-num">00</div>
+      <h2>Visão geral</h2>
+      <p>
+        REFINA nasceu de uma pergunta prática: e se, em vez de mandar a
+        história direto para um agente de desenvolvimento, alguém —
+        humano ou agente — garantisse primeiro que ela está clara o
+        suficiente pra ser implementada sem ambiguidade escondida?
+      </p>
+      <p>
+        A analogia de origem é o loop de agentes autônomos de codificação
+        (plan → execute → observe → re-plan). REFINA aplica a mesma
+        disciplina, mas aplicada à <b style="color:var(--text)">entrega de
+        uma história inteira</b>, não só à escrita de código: ele decide o
+        quê fazer e quando, nunca escreve código de produção diretamente —
+        isso é sempre delegado ao subagente <code>refina-builder</code>.
+      </p>
+      <div class="callout">
+        <p><b>Princípio central:</b> é mais barato gastar alguns minutos
+        alinhando a especificação antes do que descobrir, no final, que o
+        código não corresponde ao que foi pedido.</p>
+      </div>
+    </section>
+
+    <section id="diagrama">
+      <div class="section-num">01</div>
+      <h2>Diagrama do loop</h2>
+      <p>O ciclo completo, do recebimento da história até o veredito final.</p>
+      <div class="diagram-frame">
+        <pre class="mermaid">
+flowchart TD
+    A["História bruta"] --> B["1. Ingerir"]
+    B --> C{"2. Validar DoR<br/>4 gates"}
+    C -->|"FAIL"| Z(["pausa · devolve pro engenheiro"])
+    C -->|"PASS"| D["3. Especificar<br/>OpenSpec: proposal + tasks"]
+    D --> E{"4. Decidir abordagem<br/>categoria sensível?"}
+    E -->|"padrão obrigatório<br/>não encontrado"| F["pergunta ao engenheiro<br/>registra em AGENTS.md"]
+    E -->|"trade-off normal"| G["apresenta opções<br/>aguarda confirmação"]
+    F --> H
+    G --> H{"5. Delegar + observar<br/>1 task por vez"}
+    H --> I["refina-builder<br/>implementa"]
+    I --> J["REFINA lê o código<br/>checklist + validação semântica"]
+    J --> K{"passou?"}
+    K -->|"não · até 3x"| H
+    K -->|"sim · há mais tasks"| H
+    K -->|"sim · última task"| L["6. Fechamento<br/>revalida tudo"]
+    L --> M(["veredito final<br/>engenheiro aceita"])
+
+    classDef stop fill:#1e222a,stroke:#f87171,stroke-width:1.5px,color:#e8e6e1
+    classDef go fill:#1e222a,stroke:#4ade80,stroke-width:1.5px,color:#e8e6e1
+    classDef mid fill:#171a20,stroke:#ec7000,stroke-width:1.5px,color:#e8e6e1
+    class Z stop
+    class M go
+    class B,D,F,G,I,J,L mid
+        </pre>
+      </div>
+    </section>
+
+    <section id="fases">
+      <div class="section-num">02</div>
+      <h2>As 6 fases</h2>
+
+      <div class="phase">
+        <div class="phase-num">01</div>
+        <div>
+          <div class="phase-title">Ingerir <span class="tag auto">Automática</span></div>
+          <p style="margin-bottom:0">Lê a história completa. Se vier só um link sem conteúdo, pede o texto — nunca assume o conteúdo de um sistema que não consegue acessar.</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-num">02</div>
+        <div>
+          <div class="phase-title">Validar DoR <span class="tag checkpoint">Checkpoint</span></div>
+          <p style="margin-bottom:0">Roda os 4 gates de Definition of Ready. Reprovação em qualquer gate para o loop até a história ser ajustada — nunca avança "torcendo pra dar certo".</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-num">03</div>
+        <div>
+          <div class="phase-title">Especificar <span class="tag auto">Automática, com output visível</span></div>
+          <p style="margin-bottom:0">Gera <code>proposal.md</code>, spec deltas e <code>tasks.md</code> em <code>openspec/changes/</code>. Mostra o conteúdo no chat — nunca escreve silenciosamente.</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-num">04</div>
+        <div>
+          <div class="phase-title">Decidir abordagem técnica <span class="tag checkpoint">Checkpoint</span></div>
+          <p style="margin-bottom:0">Detecta categorias sensíveis (fila, API, autenticação, criptografia), busca precedente no repo e pergunta se não encontrar — nunca improvisa uma solução genérica quando existe padrão corporativo obrigatório. A resposta fica registrada em <code>AGENTS.md</code> para a próxima história.</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-num">05</div>
+        <div>
+          <div class="phase-title">Delegar e observar <span class="tag auto">Loop até entregar</span></div>
+          <p style="margin-bottom:0">Uma task por vez ao <code>refina-builder</code>. Depois de cada retorno, REFINA lê o código (checklist de qualidade) e valida se o teste realmente cobre a regra de negócio — não só se "passou o build". Reprovação gera nova delegação com feedback específico, até 3 tentativas.</p>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-num">06</div>
+        <div>
+          <div class="phase-title">Fechamento <span class="tag checkpoint">Checkpoint</span></div>
+          <p style="margin-bottom:0">Revalida tudo contra o resultado final e devolve o veredito consolidado. Só o engenheiro humano fecha a história — REFINA nunca se autodeclara pronto.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="gates">
+      <div class="section-num">03</div>
+      <h2>Gates de DoR</h2>
+      <p>Cada gate exige evidência citada da própria história — nunca "parece bom".</p>
+      <table>
+        <tr><th>Gate</th><th>Valida</th></tr>
+        <tr><td>Valor &amp; Dor</td><td>Problema do usuário claro, métrica de sucesso, rastreável a um epic</td></tr>
+        <tr><td>Funcional (INVEST)</td><td>Critérios de aceite testáveis em Given/When/Then, casos de borda listados</td></tr>
+        <tr><td>Técnico</td><td>Compatibilidade com arquitetura existente, dependências mapeadas</td></tr>
+        <tr><td>Não-funcional</td><td>Performance, segurança, observabilidade — reprovação automática se envolve dado sensível e nada foi dito</td></tr>
+      </table>
+    </section>
+
+    <section id="qualidade">
+      <div class="section-num">04</div>
+      <h2>Qualidade de código &amp; validação semântica de teste</h2>
+      <p>
+        Esta revisão é feita pelo próprio REFINA lendo o código — não por
+        script determinístico. Um script pega padrão mecânico; julgar se
+        um teste cobre a regra de negócio exige entender o que o código
+        faz.
+      </p>
+      <h3>Checklist de qualidade de código</h3>
+      <ul class="plain">
+        <li><b>Duplicação</b> — lógica repetida que deveria estar extraída</li>
+        <li><b>Métodos longos</b> — responsabilidade única, ou misturando validação + negócio + acesso a dado</li>
+        <li><b>Aninhamento profundo</b> — daria pra simplificar com early return?</li>
+        <li><b>Nomenclatura</b> — nomes comunicam intenção, ou são genéricos?</li>
+        <li><b>Acoplamento desnecessário</b> — reusa abstração existente, ou introduz dependência nova sem necessidade?</li>
+      </ul>
+      <h3>Validação semântica de teste</h3>
+      <ul class="plain">
+        <li>O teste constrói um cenário que exercita a regra de negócio, não só chama o método?</li>
+        <li>Se a lógica estivesse errada, o teste realmente falharia?</li>
+        <li>Assert genérico (<code>assertNotNull</code>) sem checar valor específico é reprovação automática</li>
+      </ul>
+    </section>
+
+    <section id="padroes">
+      <div class="section-num">05</div>
+      <h2>Padrões técnicos corporativos</h2>
+      <p>
+        Em vez de manter uma tabela de frameworks obrigatórios (inviável
+        de manter atualizada), REFINA detecta categoria sensível, busca
+        precedente no próprio repositório via <code>Grep</code>/<code>Glob</code>,
+        e só pergunta quando não encontra nada — a resposta vira
+        conhecimento permanente em <code>AGENTS.md</code>.
+      </p>
+      <div class="callout">
+        <p><b>Exemplo:</b> história menciona fila SQS → REFINA busca uso
+        existente de client de mensageria no repo → não encontra → pergunta
+        qual framework interno usar → engenheiro responde uma vez →
+        próxima história com fila já encontra a resposta registrada, sem
+        perguntar de novo.</p>
+      </div>
+    </section>
+
+    <section id="arquivos">
+      <div class="section-num">06</div>
+      <h2>Estrutura de arquivos</h2>
+      <div class="tree">seu-repo/
+└── <span class="c">.claude/agents/</span>
+    ├── <span class="f">refina.md</span>          <span class="c"># orquestrador</span>
+    └── <span class="f">refina-builder.md</span>  <span class="c"># implementador</span></div>
+    </section>
+
+    <section id="instalacao">
+      <div class="section-num">07</div>
+      <h2>Instalação</h2>
+      <ul class="plain">
+        <li>Copie os 2 arquivos para <code>.claude/agents/</code> no repositório.</li>
+        <li>Commit — o Claude Code detecta o subagente automaticamente, sem restart na maioria dos casos.</li>
+        <li>Invoque naturalmente: <i>"REFINA, entrega a história HIST-XXXX"</i> ou peça explicitamente: <i>"usa o refina para essa história"</i>.</li>
+      </ul>
+    </section>
+
+    <footer>
+      REFINA v1.0 — Harness Engineering
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#171a20',
+      primaryColor: '#1e222a',
+      primaryTextColor: '#e8e6e1',
+      primaryBorderColor: '#ec7000',
+      lineColor: '#656d7a',
+      secondaryColor: '#1e222a',
+      tertiaryColor: '#171a20',
+      fontFamily: 'IBM Plex Mono, monospace',
+      fontSize: '13px'
+    },
+    flowchart: { curve: 'basis', padding: 12 }
+  });
+</script>
+
+</body>
+</html>
