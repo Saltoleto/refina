@@ -1,5 +1,6 @@
 # Contexto
 
+Projeto: `itau-ig3-app-agregacao-produtosfinanceirosms`
 
 Pipeline: evento Kafka (conta permitida do usuário) → aplicação salva na tabela DynamoDB `3004` → a mesma aplicação publica em uma fila **SQS FIFO** agrupada por `MessageGroupId = userId` → a própria aplicação consome essa fila FIFO → grava o agrupamento na tabela DynamoDB `3001` (`tbig3001_agru_agrd_finn`).
 
@@ -37,3 +38,7 @@ Tornar `idAgrupamento` determinístico a partir do `idUsuario` (ex: `UUID.nameUU
    - Qualquer outra abordagem que a análise do código real revele ser mais adequada, considerando os pontos de integração existentes (eventos emitidos, cache, outros consumidores da 3001).
 
 Para cada opção sugerida, indicar impacto em compatibilidade (contratos de API/eventos existentes), esforço estimado de implementação e riscos.
+
+# Entregável adicional
+
+Ao final da análise e das propostas, gerar **um ou mais diagramas no padrão C4 Model** (nível de Componentes e/ou Container, conforme apropriado) representando a arquitetura de cada solução proposta — mostrando o fluxo entre Kafka, a aplicação, a fila (SQS FIFO/standard, se aplicável), as tabelas DynamoDB (3004, 3001 e eventual tabela/registro de controle) e os pontos de leitura/escrita envolvidos em cada abordagem, para facilitar a comparação visual entre as opções.
