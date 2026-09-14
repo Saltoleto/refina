@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onboarding IG3 — Proposta de Arquitetura (Kafka)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --panel-2: #1c2437;
+    --border: #2a3450;
+    --text: #e7ecf7;
+    --text-dim: #9aa7c2;
+    --accent: #5eb0ff;
+    --accent-2: #7ee2b8;
+    --warn: #ffb75e;
+    --danger: #ff7e8a;
+    --code-bg: #0b0f1a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 100px; }
+  header.hero {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 36px;
+  }
+  header.hero .kicker {
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  header.hero h1 { font-size: 30px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  header.hero p { color: var(--text-dim); font-size: 16px; margin: 0; max-width: 720px; }
+
+  section { margin-bottom: 44px; }
+  h2 {
+    font-size: 20px;
+    margin: 0 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  h3 { font-size: 16px; color: var(--accent-2); margin: 24px 0 10px; }
+  p { color: var(--text-dim); margin: 0 0 12px; }
+  ul, ol { color: var(--text-dim); padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--text); }
+
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 14px 0;
+  }
+  .callout.rule { border-left-color: var(--danger); }
+  .callout.rule .label { color: var(--danger); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .callout.win { border-left-color: var(--accent-2); }
+  .callout.win .label { color: var(--accent-2); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .diagram-title { font-size: 13px; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  .inline-code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: var(--accent-2); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { color: var(--text); }
+  td.dim { color: var(--text-dim); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .card h4 { margin: 0 0 8px; font-size: 14px; color: var(--text); }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.new { background: rgba(126,226,184,0.15); color: var(--accent-2); }
+  .badge.same { background: rgba(154,167,194,0.15); color: var(--text-dim); }
+
+  footer { color: var(--text-dim); font-size: 13px; text-align: center; margin-top: 60px; border-top: 1px solid var(--border); padding-top: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">Onboarding · IG3 · Variante Kafka</div>
+    <h1>Eliminando a latência do onboarding em massa</h1>
+    <p>Proposta de arquitetura para substituir o fluxo de eventos individuais (1 evento Kafka por conta) por um
+    fluxo de eventos em lote (1 evento Avro por lote), consumido diretamente do Kafka pelo IG3 (sem a ponte SQS
+    usada hoje), mantendo o repermissionamento no modelo atual e introduzindo uma trava de exclusão mútua entre
+    os dois processos.</p>
+  </header>
+
+  <section>
+    <h2><span class="num">1</span> Diagnóstico e problema</h2>
+    <p>Para operadores com 1000+ contas, o onboarding fica visivelmente lento — as contas aparecem "gota a gota" na tela.
+    A causa raiz está concentrada em <strong>IG3</strong>, não na geração dos eventos:</p>
+    <ul>
+      <li>YO4 já processa e publica os eventos de forma paralela e em lote — não é o gargalo.</li>
+      <li>O consumo em IG3 é serializado pelo SQS FIFO (agrupado por idUsuario).</li>
+      <li>Cada evento de conta dispara, na tabela de agrupamento (3001), o padrão: <em>ler o agrupamento inteiro → apagar tudo → regravar tudo</em> — custo O(N) por evento, ou seja, <strong>O(N²)</strong> no total para um onboarding de N contas.</li>
+    </ul>
+    <div class="callout">
+      <div class="label" style="color:var(--accent)">Insight chave</div>
+      No onboarding o agrupamento é sempre novo — não existe estado anterior para mesclar. Isso permite abandonar o
+      padrão incremental inteiramente nesse fluxo e escrever o agrupamento completo <strong>uma única vez</strong>, ao final.
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-title">Antes × Depois — visão rápida do que muda</div>
+      <pre class="mermaid">
+graph LR
+  subgraph ANTES["ANTES — evento por conta"]
+    direction TB
+    A1["YO4<br/>1 evento por conta"] --> A2["Kafka"]
+    A2 --> A3["SQS FIFO<br/>agrupado por idUsuario"]
+    A3 --> A4["IG3 consumer<br/>1 conta por vez"]
+    A4 --> A5[("3001<br/>ler tudo + apagar tudo<br/>+ regravar tudo<br/>O(N²)")]
+  end
+  subgraph DEPOIS["DEPOIS — lotes via Kafka"]
+    direction TB
+    B1["YO4<br/>threads paralelas"] --> B2["Kafka<br/>1 evento Avro por lote"]
+    B2 --> B4["IG3 consumer<br/>lote inteiro"]
+    B4 --> B5[("3004<br/>BatchWriteItem por lote")]
+    B5 --> B6{"contador de lotes<br/>== totalLotes?"}
+    B6 -->|não| FIM1["aguarda próximos lotes"]
+    B6 -->|sim| B7[("3001<br/>1 escrita em lote<br/>mesma modelagem, versão inicial<br/>O(N)")]
+  end
+      </pre>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span> Regra de negócio nova</h2>
+    <div class="callout rule">
+      <div class="label">Regra</div>
+      O repermissionamento é disparado sempre que as telas de <strong>Saldos</strong> ou <strong>Limites</strong>
+      (aplicações que moram em IG3) recebem uma requisição GET. Essas aplicações chamam YO4 de forma assíncrona
+      (fire-and-forget, sem esperar resposta) a cada requisição. YO4 controla, via Redis, se já existe um
+      repermissionamento ou um onboarding em andamento para o operador — se sim, a chamada é descartada.
+    </div>
+    <p>Motivo: o onboarding passa a fazer uma escrita <em>bulk</em> do agrupamento inteiro ao final. Se um evento
+    incremental de repermissionamento escrever no meio desse processo, pode ser sobrescrito pela escrita em lote
+    do onboarding (ou vice-versa), gerando inconsistência. Como toda consulta a Saldos/Limites tenta disparar o
+    repermissionamento, o controle de concorrência precisa acontecer no YO4, antes de iniciar qualquer execução.</p>
+
+    <div class="callout win">
+      <div class="label">Escopo desta mudança</div>
+      O repermissionamento — disparo pelas telas, throttle de 30 minutos no Redis, comparação com a fonte externa,
+      publicação no Kafka e a escrita na 3001 — permanece <strong>exatamente como está hoje</strong>, em YO4 e em
+      IG3, sem nenhuma alteração de código. A única mudança que toca esse fluxo é uma extensão pontual da validação
+      que já existe em YO4: além de checar se já há um repermissionamento em andamento (throttle), passa a checar
+      também se há um onboarding em andamento — mesmo mecanismo de validação, um critério a mais. Todas as demais
+      regras novas descritas neste documento (locks, contador de lotes, escrita em lote) aplicam-se apenas ao
+      onboarding.
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span> Diagrama de contexto (C4)</h2>
+    <div class="diagram">
+      <div class="diagram-title">Nível 1 — Contexto do sistema</div>
+      <pre class="mermaid">
+C4Context
+  title Contexto — Onboarding e Repermissionamento de Contas
+  Person(operador, "Operador", "Realiza onboarding e consulta Saldos/Limites")
+  System_Ext(apiExterna, "API Externa", "Fonte das contas permitidas por operador")
+  System(yo4, "YO4", "Busca contas permitidas, conduz onboarding e repermissionamento")
+  System(ig3, "IG3", "Telas Saldos/Limites + gerencia contas permitidas (3004) e agrupamentos (3001)")
+  System(kafka, "Kafka", "Mensageria de eventos: lote (onboarding) e conta individual (repermissionamento)")
+  SystemDb(redis, "Redis", "Locks de onboarding/repermissionamento e contador de lotes, por operador")
+  SystemDb(dynamo, "DynamoDB", "3004 (contas) e 3001 (agrupamento)")
+
+  Rel(operador, yo4, "Inicia onboarding")
+  Rel(operador, ig3, "Consulta Saldos/Limites")
+  Rel(yo4, apiExterna, "Consulta contas permitidas")
+  Rel(yo4, kafka, "Publica lotes de contas (onboarding) e eventos incrementais (repermissionamento)")
+  Rel(kafka, ig3, "Entrega eventos para consumo")
+  Rel(ig3, yo4, "Dispara repermissionamento (assíncrono, a cada GET)")
+  Rel(yo4, redis, "Verifica/seta locks antes de iniciar onboarding ou repermissionamento")
+  Rel(ig3, redis, "Incrementa contador de lotes e libera lock ao concluir")
+  Rel(ig3, dynamo, "Lê e grava")
+      </pre>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span> Diagrama de contêineres (C4)</h2>
+    <div class="diagram">
+      <div class="diagram-title">Nível 2 — Contêineres dentro de IG3</div>
+      <pre class="mermaid">
+C4Container
+  title Contêineres — IG3, YO4 e Mensageria
+  System_Boundary(ig3b, "IG3") {
+    Container(saldos, "Saldos", "App", "Tela consultada pelo operador, dispara repermissionamento a cada GET")
+    Container(limites, "Limites", "App", "Tela consultada pelo operador, dispara repermissionamento a cada GET")
+    Container(consumerLote, "Consumer de Lotes", "Kafka Consumer", "Consome eventos de lote (onboarding), grava na 3004 e controla o contador")
+    Container(consumerEvento, "Consumer de Eventos", "Kafka Consumer", "Consome eventos incrementais de conta (repermissionamento)")
+    ContainerDb(t3004, "Tabela 3004", "DynamoDB", "Espelho de contas permitidas por operador")
+    ContainerDb(t3001, "Tabela 3001", "DynamoDB", "Agrupamento conta-usuário — modelagem atual (1 linha por conta + coluna versão), sem alteração")
+  }
+  System_Boundary(yo4b, "YO4") {
+    Container(publisher, "Publisher de Lotes", "Serviço", "Monta os lotes e publica no tópico Kafka; valida lock antes de iniciar")
+    Container(orquestradorReperm, "Orquestrador de Repermissionamento", "Serviço", "Recebe disparo de Saldos/Limites, valida locks, publica evento")
+    ContainerDb(redis, "Redis", "Locks de onboarding/repermissionamento e contador de lotes, por operador (TTL)")
+  }
+  System_Boundary(kafkaB, "Mensageria") {
+    Container(topicoLote, "Tópico de Lotes", "Kafka + Avro", "1 mensagem por lote de contas (onboarding), sem chave fixa — distribuída entre partições")
+    Container(topicoDlq, "Tópico Dead-Letter", "Kafka + Avro", "Mensagens de lote que falharam após tentativas de processamento")
+    Container(topicoEvento, "Tópico de Eventos", "Kafka + Avro", "1 mensagem por conta alterada (repermissionamento)")
+  }
+
+  Rel(saldos, orquestradorReperm, "Dispara repermissionamento (assíncrono)", "HTTP")
+  Rel(limites, orquestradorReperm, "Dispara repermissionamento (assíncrono)", "HTTP")
+  Rel(orquestradorReperm, redis, "Verifica e seta locks antes de iniciar")
+  Rel(orquestradorReperm, topicoEvento, "Publica evento conta alterada")
+  Rel(topicoEvento, consumerEvento, "Entrega evento")
+  Rel(consumerEvento, t3001, "Fluxo atual mantido (query completa + delete + write completo do agrupamento)")
+
+  Rel(publisher, redis, "Seta lock:onboarding antes de iniciar")
+  Rel(publisher, topicoLote, "Publica 1 mensagem Avro por lote, sem chave fixa")
+  Rel(topicoLote, consumerLote, "Consumer group consome diretamente (sem SQS)")
+  Rel(consumerLote, t3004, "BatchWriteItem por lote")
+  Rel(consumerLote, redis, "INCR contador de lotes confirmados; commit do offset só após sucesso")
+  Rel(consumerLote, t3001, "BatchWriteItem do agrupamento completo (versão inicial), quando contador atinge o total")
+  Rel(consumerLote, topicoDlq, "Publica lote com falha persistente, após N tentativas")
+      </pre>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span> Fluxo de onboarding (lote)</h2>
+    <div class="diagram">
+      <div class="diagram-title">Sequência — envio de lotes e agrupamento final</div>
+      <pre class="mermaid">
+sequenceDiagram
+  participant YO4 as YO4 (threads paralelas)
+  participant Redis
+  participant Kafka as Tópico de Lotes
+  participant Consumer as IG3 Consumer de Lotes
+  participant DB as DynamoDB (3004/3001)
+  participant DLQ as Tópico Dead-Letter
+
+  YO4->>Redis: Seta lock:onboarding:{idOperador} (TTL segurança)
+  par lote 1
+    YO4->>Kafka: Publica mensagem Avro (numeroLote=1, totalLotes=10, sem chave fixa)
+    Kafka->>Consumer: poll() entrega lote 1 (partição X)
+    Consumer->>DB: BatchWriteItem contas do lote (3004)
+    alt sucesso
+      Consumer->>Redis: INCR contador:onboarding:{idOnboarding}
+      Consumer->>Kafka: commit offset (manual, só após sucesso)
+    else falha após N tentativas
+      Consumer->>DLQ: Publica mensagem original (poison pill)
+      Consumer->>Kafka: commit offset (libera a partição)
+    end
+  and lote 2
+    YO4->>Kafka: Publica mensagem Avro (numeroLote=2, totalLotes=10, sem chave fixa)
+    Kafka->>Consumer: poll() entrega lote 2 (partição Y, em paralelo)
+    Consumer->>DB: BatchWriteItem contas do lote (3004)
+    Consumer->>Redis: INCR contador:onboarding:{idOnboarding}
+    Consumer->>Kafka: commit offset
+  and lote N
+    YO4->>Kafka: Publica mensagem Avro (numeroLote=N, totalLotes=10, sem chave fixa)
+    Kafka->>Consumer: poll() entrega lote N
+    Consumer->>DB: BatchWriteItem contas do lote (3004)
+    Consumer->>Redis: INCR contador:onboarding:{idOnboarding} (retorna 10 == totalLotes)
+    Consumer->>Kafka: commit offset
+    Consumer->>DB: Query contas do operador (3004)
+    Consumer->>DB: BatchWriteItem do agrupamento completo (3001), versão inicial — mesma modelagem atual
+    Consumer->>Redis: Remove lock:onboarding:{idOperador}
+  end
+      </pre>
+    </div>
+    <p>A publicação é <strong>fire-and-forget</strong> (YO4 não espera confirmação de processamento) — diferente do
+    fluxo HTTP, não existe uma resposta síncrona indicando que o onboarding terminou. Por isso, quem libera o
+    <span class="inline-code">lock:onboarding</span> ao final é o próprio consumer do IG3, no mesmo passo em que
+    grava o agrupamento; o TTL do lock continua como rede de segurança caso essa liberação não aconteça (falha no
+    consumer, por exemplo).</p>
+
+    <h3>Contrato — Tópico Kafka de lotes</h3>
+    <p>YO4 publica os lotes em <strong>paralelo, com concorrência limitada</strong> (mesmo padrão de virtual threads +
+    semaphore já usado hoje para consultar a API externa). IG3 consome diretamente do tópico (sem SQS intermediário —
+    ver seção de decisões de mensageria). A mensagem <strong>não usa chave fixa</strong> (nem por
+    <span class="inline-code">idOperador</span>, nem por conta): como o gatilho do agrupamento não depende de ordem
+    entre lotes, uma chave fixa só reduziria o paralelismo entre partições sem trazer benefício.</p>
+    <pre><code>{
+  "type": "record",
+  "name": "LoteContasOnboarding",
+  "namespace": "com.itau.onboarding.ig3",
+  "fields": [
+    { "name": "idOnboarding", "type": "string" },
+    { "name": "idOperador", "type": "string" },
+    { "name": "numeroLote", "type": "int" },
+    { "name": "totalLotes", "type": "int" },
+    {
+      "name": "contas",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "Conta",
+          "fields": [
+            { "name": "idConta", "type": "string" },
+            { "name": "agencia", "type": "string" },
+            { "name": "tipo", "type": "string" }
+          ]
+        }
+      }
+    },
+    { "name": "timestampEnvio", "type": "long", "logicalType": "timestamp-millis" }
+  ]
+}</code></pre>
+    <p style="font-size:13px">O tamanho do lote (quantidade de contas por mensagem) deve ser calibrado contra o
+    limite de mensagem configurado no cluster Kafka (<span class="inline-code">message.max.bytes</span> /
+    <span class="inline-code">max.request.size</span>), medindo o custo em bytes de uma conta serializada em Avro
+    e aplicando uma margem de segurança — não deve ser definido por estimativa.</p>
+
+    <h3>Regra para identificar o último lote</h3>
+    <p>A entrega via Kafka é <em>at-least-once</em> e, sem chave fixa, os lotes se distribuem entre partições e podem
+    ser processados em paralelo — não há garantia de ordem nem de entrega única. A regra adotada é:</p>
+    <ol>
+      <li>YO4 inclui <span class="inline-code">totalLotes</span> em toda mensagem publicada (mesmo valor em todas as mensagens de um mesmo <span class="inline-code">idOnboarding</span>).</li>
+      <li>Ao consumir uma mensagem, o consumer verifica se aquele <span class="inline-code">numeroLote</span> específico já foi processado
+        (<span class="inline-code">SETNX lote-processado:{idOnboarding}:{numeroLote}</span> no Redis) — evita dupla contagem em reentregas do Kafka.</li>
+      <li>Se for a primeira vez processando esse lote, grava as contas na 3004 (BatchWriteItem, naturalmente idempotente) e incrementa
+        atomicamente <span class="inline-code">contador:onboarding:{idOnboarding}</span> via <span class="inline-code">INCR</span> no Redis.</li>
+      <li>O <span class="inline-code">INCR</span> é atômico: apenas uma execução recebe, como retorno, o valor exatamente
+        igual a <span class="inline-code">totalLotes</span>. É essa execução — não importa qual <span class="inline-code">numeroLote</span>
+        ela carregue — que fica responsável por disparar o agrupamento.</li>
+      <li>Isso garante exclusividade do disparo sem lock adicional em nível de aplicação, e funciona independente da
+        ordem de entrega ou de quantas partições estejam em uso.</li>
+      <li>Se algum lote nunca for confirmado (mensagem perdida, poison pill enviado à DLQ) e o contador nunca atingir
+        <span class="inline-code">totalLotes</span>, o <span class="inline-code">lock:onboarding</span> expira pelo TTL
+        de segurança e o onboarding deve ser reiniciado (novo <span class="inline-code">idOnboarding</span>).</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span> Decisões de mensageria e pontos de atenção</h2>
+    <p>Este fluxo discute e decide, para o tópico de lotes de onboarding especificamente, pontos que não existiam
+    no desenho original (que reaproveitava a ponte Kafka → SQS já existente). Nada aqui afeta o repermissionamento.</p>
+
+    <h3>Remoção do SQS FIFO</h3>
+    <div class="callout win">
+      <div class="label">Decisão</div>
+      IG3 passa a consumir o tópico de lotes <strong>diretamente do Kafka</strong>, sem a ponte para SQS FIFO usada
+      no fluxo atual.
+    </div>
+    <p>Motivação, com base na avaliação feita:</p>
+    <ul>
+      <li>A ponte Kafka → SQS é <strong>exclusiva deste fluxo</strong> — remover não impacta outros consumidores.</li>
+      <li>IG3 (aplicação ProdutosFinanceiros) <strong>já consome Kafka nativamente hoje</strong> — não é uma integração nova, é remover uma etapa que a aplicação já sabe operar sem o SQS no meio.</li>
+      <li>O time já tem experiência operacional com Kafka.</li>
+      <li>Do SQS, hoje só o <strong>retry</strong> é de fato aproveitado — a DLQ existe mas não tem consumer, ou seja, é um benefício teórico não utilizado na prática.</li>
+      <li>O ganho de latência de remover um hop só é mensurável após a implantação — não é a justificativa principal da decisão, que é simplificação de infraestrutura sem perda de garantias realmente usadas.</li>
+    </ul>
+    <p>O retry que o SQS oferecia (via visibility timeout) é substituído pela combinação de <strong>commit manual de offset</strong> e um <strong>tópico dead-letter</strong>, detalhados abaixo.</p>
+
+    <h3>Chave da mensagem e paralelismo</h3>
+    <p>Uma mensagem Kafka vai para exatamente uma partição, decidida pela chave (hash) ou round-robin se não houver
+    chave. Como a ordem entre lotes não importa para o gatilho do agrupamento, <strong>a mensagem não usa chave
+    fixa</strong> — usar <span class="inline-code">idOperador</span> como chave forçaria todos os lotes de um mesmo
+    onboarding para a mesma partição, <strong>eliminando o paralelismo entre eles</strong> sem nenhum ganho em troca.</p>
+    <p>O paralelismo real de consumo é limitado ao número de partições do tópico: no máximo uma instância de consumer
+    por partição processa mensagens simultaneamente dentro do mesmo consumer group. O número de partições deve ser
+    dimensionado considerando o volume esperado de lotes simultâneos entre onboardings concorrentes.</p>
+
+    <h3>Estratégia de commit de offset</h3>
+    <p>Commit <strong>manual</strong> (<span class="inline-code">enable.auto.commit=false</span>). O offset de uma
+    mensagem só é commitado depois que a escrita na 3004 (e o <span class="inline-code">INCR</span> no Redis) forem
+    confirmados com sucesso. Isso replica, no Kafka, a garantia que o <span class="inline-code">visibility timeout</span>
+    do SQS oferecia: se o consumer cair antes de comitar, a mensagem é reentregue no próximo início de sessão
+    (reinício ou rebalance), a partir do último offset comitado.</p>
+
+    <h3>Risco: mensagem "poison pill" sem DLQ automática</h3>
+    <div class="callout rule">
+      <div class="label">Ponto de atenção</div>
+      Sem o SQS, perde-se a DLQ automática. Uma mensagem que sempre falha ao processar (ex: campo obrigatório
+      ausente para a escrita no Dynamo) nunca teria seu offset comitado — a cada reinício ou rebalance, o consumer
+      voltaria a buscar a partir do último offset comitado, reprocessando essa mensagem (e as que vieram depois dela
+      na mesma partição) indefinidamente, travando o avanço daquela partição.
+    </div>
+    <p>Mitigação proposta: um <strong>tópico dead-letter dedicado</strong>. Após N tentativas de processamento com
+    falha para a mesma mensagem, o consumer publica a mensagem original nesse tópico e <strong>comita o offset</strong>
+    mesmo sem sucesso no Dynamo, liberando a partição para seguir adiante. Mensagens no tópico dead-letter devem
+    gerar alerta para investigação manual — este mecanismo substitui a DLQ que o SQS oferecia de forma automática.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">7</span> Fluxo de repermissionamento (disparo sob demanda)</h2>
+    <div class="diagram">
+      <div class="diagram-title">Sequência — Saldos/Limites disparam YO4, que valida os locks no Redis</div>
+      <pre class="mermaid">
+sequenceDiagram
+  participant Op as Operador
+  participant App as Saldos / Limites (IG3)
+  participant YO4
+  participant Redis
+  participant Kafka
+  participant Consumer as IG3 (Consumer)
+  participant DB as DynamoDB (3001)
+
+  Op->>App: GET Saldos ou Limites
+  App-->>Op: Responde a consulta (não espera YO4)
+  App->>YO4: Dispara repermissionamento (assíncrono, fire-and-forget)
+  YO4->>Redis: Existe lock:onboarding ou lock:repermissionamento p/ operador?
+  alt Algum lock ativo
+    YO4->>YO4: Descarta a chamada (no-op)
+  else Sem locks ativos
+    YO4->>Redis: Seta lock:repermissionamento:{idOperador} (TTL 30min — throttle)
+    YO4->>YO4: Compara contas com fonte externa
+    YO4->>Kafka: Publica evento por conta alterada (se houver)
+    Kafka->>Consumer: Consome evento
+    Consumer->>DB: Fluxo atual mantido (lock interno + query completa do agrupamento + delete + write completo)
+  end
+      </pre>
+    </div>
+    <p><strong>Este fluxo não sofre nenhuma alteração</strong> — está descrito aqui apenas para mostrar onde a nova
+    checagem do lock de onboarding se encaixa. Toda consulta a Saldos ou Limites tenta disparar o repermissionamento.
+    A chave <span class="inline-code">lock:repermissionamento:{idOperador}</span> tem TTL de <strong>30 minutos</strong>: a
+    intenção principal não é só evitar execuções concorrentes, mas <strong>evitar repermissionar o operador com
+    frequência excessiva</strong> — uma vez disparado, novas tentativas nos 30 minutos seguintes são descartadas,
+    mesmo que a execução anterior já tenha terminado há tempo. Como IG3 não espera resposta de YO4, o controle
+    precisa acontecer inteiramente do lado do YO4, antes de qualquer processamento começar. Isso também evita que
+    eventos de repermissionamento sejam gerados durante um onboarding — o conflito é prevenido na origem, sem
+    precisar de alteração no consumer do IG3, que mantém a modelagem e o fluxo de escrita atuais da 3001.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">8</span> Modelo de dados</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h4>3004 — Contas permitidas <span class="badge same">sem mudança de schema</span></h4>
+        <p style="margin:0">PK: <span class="inline-code">idOperador</span><br>SK: <span class="inline-code">idConta</span></p>
+      </div>
+      <div class="card">
+        <h4>Locks e contador (Redis, no YO4/IG3) <span class="badge new">novo</span></h4>
+        <p style="margin:0">Chave: <span class="inline-code">lock:onboarding:{idOperador}</span> (TTL longo, ex. 2h — liberado pelo consumer ao concluir, TTL como rede de segurança)<br>Chave: <span class="inline-code">lock:repermissionamento:{idOperador}</span> (TTL 30min — throttle, expira sozinho)<br>Chave: <span class="inline-code">contador:onboarding:{idOnboarding}</span> (contador de lotes confirmados)<br>Chave: <span class="inline-code">lote-processado:{idOnboarding}:{numeroLote}</span> (idempotência contra reentrega do Kafka)</p>
+      </div>
+      <div class="card">
+        <h4>3001 — Agrupamento conta-usuário <span class="badge same">sem mudança de schema</span></h4>
+        <p style="margin:0">PK: <span class="inline-code">idAgrupamento#idOperador</span><br>SK: <span class="inline-code">idConta</span><br>Coluna <span class="inline-code">versão</span> igual em todas as linhas do agrupamento — modelagem atual, mantida como está. No onboarding, todas as linhas são gravadas de uma vez com a versão inicial; no repermissionamento, o fluxo incremental atual (query + delete + write completo) permanece inalterado.</p>
+      </div>
+      <div class="card">
+        <h4>Tópico Dead-Letter <span class="badge new">novo</span></h4>
+        <p style="margin:0">Recebe a mensagem original de um lote que falhou após N tentativas de processamento. Substitui a DLQ automática que o SQS oferecia — requer alerta manual sobre novas mensagens.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">9</span> Casos de borda</h2>
+    <table>
+      <tr><th>Cenário</th><th>Tratamento</th></tr>
+      <tr><td class="dim">Mensagem de lote reentregue (Kafka at-least-once, reinício ou rebalance)</td><td>Commit manual de offset (só após sucesso) + BatchWriteItem idempotente na 3004 + chave <span class="inline-code">lote-processado</span> no Redis evita incrementar o contador duas vezes para o mesmo lote</td></tr>
+      <tr><td class="dim">Lotes chegam fora de ordem (sem chave fixa, paralelismo entre partições)</td><td>Consumer não depende de ordem para gravar na 3004; o disparo do agrupamento depende só do contador de lotes confirmados atingir <span class="inline-code">totalLotes</span>, não de qual lote chega por último</td></tr>
+      <tr><td class="dim">Mensagem "poison pill" (sempre falha ao processar)</td><td>Após N tentativas, consumer publica no tópico dead-letter e comita o offset, liberando a partição; alerta manual investiga depois</td></tr>
+      <tr><td class="dim">Onboarding trava no meio (mensagem perdida, falha não coberta pelo DLQ)</td><td>TTL do lock:onboarding no Redis expira sozinho após o tempo de segurança (ex: 2h), já que não há confirmação síncrona pro YO4 detectar a falha</td></tr>
+      <tr><td class="dim">Saldos/Limites disparam repermissionamento durante onboarding</td><td>YO4 encontra lock:onboarding ativo e descarta a chamada — como IG3 não espera resposta, não há retry nem fila; a próxima consulta tentará de novo naturalmente</td></tr>
+      <tr><td class="dim">Múltiplas consultas em 30min ao mesmo operador</td><td>Comportamento esperado: só a primeira dispara; as demais são descartadas pelo throttle do lock:repermissionamento</td></tr>
+      <tr><td class="dim">Dois onboardings simultâneos p/ mesmo operador</td><td>A chamada que inicia o onboarding (antes de publicar qualquer lote) verifica o lock:onboarding; se já ativo, rejeita o início e nenhum lote é publicado</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="num">10</span> Prós, contras e ganhos</h2>
+
+    <div class="grid-2">
+      <div class="card">
+        <h4 style="color:var(--accent-2)">Prós</h4>
+        <ul style="margin:0">
+          <li>Escrita na 3001 sai de O(N²) para O(N) — mesmo ganho da alternativa HTTP, sem exigir alteração de modelagem no DynamoDB</li>
+          <li>Mantém o desacoplamento e a durabilidade nativos do Kafka: falha temporária em IG3 não derruba o onboarding, as mensagens ficam retidas no tópico até serem consumidas</li>
+          <li>Remove o SQS FIFO do caminho — um hop a menos, sem perder garantias realmente usadas hoje (só o retry era aproveitado; a DLQ não tinha consumer)</li>
+          <li>Sem chave fixa na mensagem, os lotes de um mesmo onboarding se distribuem entre partições — paralelismo real no consumo, não só na publicação</li>
+          <li>Retry via commit manual de offset, sem precisar de retry/backoff manual explícito no YO4</li>
+          <li>Tela "Conectar Contas" (3004) passa a popular por lote, não conta a conta — percepção de progresso mais rápida</li>
+          <li>Onboarding e repermissionamento passam a ter exclusão mútua real, sem depender de acaso de timing</li>
+          <li>Repermissionamento não sofre nenhuma alteração de código — nem em YO4, nem em IG3 — apenas ganha uma checagem adicional na validação de throttle que já existe hoje em YO4</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="color:var(--danger)">Contras</h4>
+        <ul style="margin:0">
+          <li>O ganho de performance depende do throughput/lag do Kafka — picos de tráfego podem atrasar o processamento mesmo com o padrão em lote; o ganho de remover o SQS só é mensurável após a implantação</li>
+          <li>Não há confirmação síncrona para YO4 (nem para a tela) de que o onboarding terminou; feedback de conclusão precisa vir por outro canal (polling na 3004/3001, por exemplo)</li>
+          <li>Sem a DLQ automática do SQS, uma mensagem "poison pill" exige mecanismo próprio (tópico dead-letter + commit manual) para não travar o avanço da partição — complexidade nova que precisa ser implementada e testada</li>
+          <li>Exige verificação extra de idempotência no consumer (chave <span class="inline-code">lote-processado</span>) para lidar com o at-least-once do Kafka — o fluxo HTTP resolveria isso só com um header de idempotência na requisição</li>
+          <li>Schema Avro em produção exige gestão de compatibilidade (schema evolution) caso o formato do lote mude no futuro</li>
+          <li>Envio paralelo ainda exige coordenação via contador no Redis — mesma complexidade do fluxo HTTP nesse ponto específico</li>
+          <li>Introduz dependência do Redis no caminho crítico, assim como no fluxo HTTP</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="label" style="color:var(--accent)">Comparação com a alternativa HTTP</div>
+      Este desenho mantém a resiliência e o desacoplamento que o time já tem hoje com Kafka, ao custo de não ter
+      confirmação síncrona de conclusão e de precisar de um mecanismo próprio para mensagens problemáticas (dead-letter),
+      já que o SQS foi removido do caminho. A alternativa HTTP troca essa resiliência por simplicidade operacional e
+      uma resposta imediata de conclusão. A escolha entre as duas é uma decisão de trade-off, não uma correção técnica
+      de uma sobre a outra.
+    </div>
+
+    <h3>Ganhos de performance estimados</h3>
+    <table>
+      <tr><th>Métrica</th><th>Antes</th><th>Depois</th></tr>
+      <tr><td class="dim">Escritas na 3001 (1000 contas)</td><td class="dim">~500 mil deletes + ~500 mil writes (O(N²))</td><td>~40 chunks de BatchWriteItem (O(N)), mesma modelagem de tabela</td></tr>
+      <tr><td class="dim">Processamento em IG3</td><td class="dim">Serializado por idUsuario (SQS FIFO), 1 conta por vez</td><td>Lotes de N contas por mensagem, distribuídos entre partições, consumidos em paralelo</td></tr>
+      <tr><td class="dim">Percepção na tela "Conectar Contas"</td><td class="dim">Contas aparecem "gota a gota"</td><td>Aparecem em blocos, por lote confirmado</td></tr>
+      <tr><td class="dim">Dependência de infraestrutura no onboarding</td><td class="dim">Kafka + SQS FIFO + Redis (lock por conta)</td><td>Kafka (lote, Avro, sem SQS) + Redis (locks + contador por operador) + tópico dead-letter</td></tr>
+    </table>
+    <p style="font-size:13px">Os números de "antes" são estimativas baseadas no padrão de código identificado (query completa + delete completo + write completo por evento); recomenda-se validar com teste de carga antes/depois em ambiente controlado.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">11</span> Prompt para análise técnica assistida por IA</h2>
+    <p>Antes de iniciar a implementação, recomenda-se validar este desenho contra o código real de YO4 e IG3. O
+    prompt abaixo pode ser usado com um agente de IA com acesso aos dois repositórios, para produzir uma análise
+    técnica de viabilidade e riscos antes da construção.</p>
+    <div class="diagram">
+      <div class="diagram-title">Prompt sugerido (copiar para o agente, junto com acesso aos repositórios de YO4 e IG3)</div>
+      <pre><code>Você é um engenheiro de software sênior revisando uma proposta de arquitetura.
+Você receberá acesso aos repositórios de YO4 e IG3, que hoje implementam o fluxo
+de onboarding e repermissionamento de contas descrito neste documento. A análise
+deve ser feita a partir da branch develop de cada repositório.
+
+IMPORTANTE — ESCOPO: o repermissionamento (em YO4 e em IG3) deve permanecer
+EXATAMENTE como está hoje. As regras novas descritas neste documento (locks de
+onboarding, contador de lotes, escrita em lote na 3001) aplicam-se somente ao
+onboarding. A única mudança que toca o repermissionamento é uma extensão pontual
+da validação que já existe em YO4: além de checar se já há um repermissionamento
+em andamento (throttle), passa a checar também se há um onboarding em andamento.
+Trate qualquer outra alteração ao repermissionamento como fora do escopo desta
+proposta, e sinalize explicitamente, como risco, se identificar necessidade de
+mudanças adicionais nesse fluxo.
+
+Sua tarefa é:
+
+1. Mapear o código atual responsável por: (a) YO4 buscar e publicar contas
+   permitidas no Kafka; (b) IG3 consumir esses eventos e escrever nas
+   tabelas 3004 e 3001.
+
+2. Confirmar se o padrão de escrita da 3001 hoje realmente segue o fluxo
+   "ler agrupamento inteiro -> apagar tudo -> regravar tudo" por evento,
+   como descrito na seção de diagnóstico deste documento, ou se já existem
+   otimizações que mudam essa análise.
+
+3. Validar a viabilidade técnica da proposta: publicação de eventos em lote
+   (Avro) em vez de por conta, consumo direto do tópico Kafka pelo IG3 (sem
+   SQS intermediário), mensagem sem chave fixa (para paralelismo entre
+   partições), contador atômico via Redis para identificar o último lote, e
+   escrita única (BatchWriteItem) do agrupamento completo na 3001 sem
+   alterar a modelagem da tabela.
+
+4. Identificar divergências entre o desenho proposto e as restrições reais
+   do código atual (ex.: biblioteca de serialização já usada, versão e
+   configuração do schema registry, limites de tamanho de mensagem do
+   cluster Kafka, número de partições disponíveis/configuráveis no tópico,
+   forma como o consumer hoje trata falhas e reprocessamento, e se a
+   aplicação ProdutosFinanceiros em IG3 já expõe consumo Kafka nativo
+   reutilizável para este novo tópico).
+
+5. Levantar riscos de implementação não cobertos neste documento (ex.:
+   compatibilidade de schema Avro em produção, comportamento sob rebalance
+   de partições/consumer group, limites de throughput de escrita no
+   DynamoDB sob picos, comportamento do tópico dead-letter proposto para
+   substituir a DLQ do SQS, e se a remoção do SQS FIFO deste fluxo afeta
+   algum outro consumidor não identificado neste documento).
+
+6. Confirmar, olhando o código real de YO4, exatamente onde hoje é feita a
+   validação de throttle do repermissionamento, para apontar o ponto exato
+   onde a checagem do lock de onboarding deve ser inserida sem tocar no
+   restante da lógica.
+
+7. Validar a estratégia de commit manual de offset (commit só após sucesso
+   na 3004 e no Redis) e o desenho do tópico dead-letter contra a
+   configuração real do cliente Kafka usado hoje pelo IG3 — confirmar se
+   `enable.auto.commit` está desabilitado onde necessário e se existe
+   algum mecanismo de retry/DLQ já implementado que possa ser reaproveitado
+   em vez de criado do zero.
+
+8. Estimar o esforço de implementação (baixo/médio/alto) para cada
+   componente alterado: publisher de lotes no YO4, consumer de lotes no
+   IG3 (incluindo a remoção da dependência de SQS e a lógica de commit
+   manual/dead-letter), integração com Redis (locks, contador,
+   idempotência), schema Avro e sua publicação/versionamento. Trate a
+   extensão da validação de repermissionamento como item separado, de
+   esforço mínimo.
+
+9. Apresentar a análise em formato estruturado: resumo executivo, achados
+   técnicos por repositório, riscos identificados e recomendações.
+
+Responda apenas após revisar o código-fonte fornecido — não presuma como o
+sistema está implementado com base apenas neste documento.</code></pre>
+    </div>
+  </section>
+
+  <footer>Documento gerado para discussão de arquitetura — Onboarding / IG3 (variante Kafka)</footer>
+</div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: { darkMode: true, background: '#161d2e', primaryColor: '#1c2437', primaryTextColor: '#e7ecf7', primaryBorderColor: '#2a3450', lineColor: '#5eb0ff', secondaryColor: '#1c2437', tertiaryColor: '#161d2e' } });
+</script>
+</body>
+</html>
