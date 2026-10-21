@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Novo onboarding: YO4, IG3 e XF8</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+:root{--bg:#f3f5f8;--ink:#16202c;--mut:#566478;--line:#d5dbe4;--acc:#1f5fbf;--pnl:#e8edf4;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10161e;--ink:#e6ebf2;--mut:#9aa8bb;--line:#2a3544;--acc:#6aa4ff;--pnl:#1a2330;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10161e;--ink:#e6ebf2;--mut:#9aa8bb;--line:#2a3544;--acc:#6aa4ff;--pnl:#1a2330;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "IBM Plex Sans",system-ui,sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.7rem;line-height:1.2;margin:8px 0 6px}
+h2{font-size:1.2rem;margin:36px 0 8px;padding-top:14px;border-top:2px solid var(--line)}
+p{margin:6px 0;max-width:72ch}
+.lead,.note{color:var(--mut)}
+code,pre.c{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.82rem}
+code{background:var(--pnl);padding:1px 5px;border-radius:4px}
+pre.c{background:var(--pnl);padding:10px 12px;border-radius:8px;overflow-x:auto;margin:8px 0}
+.dg{background:#fff;border-radius:10px;padding:10px;overflow-x:auto;margin:10px 0;border:1px solid var(--line)}
+.dg pre{margin:0}
+ul,ol{padding-left:1.2rem;margin:6px 0}
+li{margin:4px 0}
+.r li::marker{color:var(--acc);font-weight:600}
+.box{border-left:4px solid var(--acc);background:var(--pnl);padding:8px 12px;border-radius:0 8px 8px 0;margin:10px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Novo onboarding: YO4, IG3 e XF8</h1>
+<p class="lead">Arquitetura em C4, fluxos de ponta a ponta e regras de negócio. O onboarding passa a processar o arquivo de permissionamento do bucket em vez de eventos Kafka em lote.</p>
+
+<div class="box"><strong>Princípio central.</strong> O YO4 é o golden source. Toda conta salva no YO4 deve existir em IG3 e XF8. O onboarding só conclui quando os dois provam isso com contagem e hash. Se algo falha, o sistema avança até convergir, sem rollback.</div>
+
+<h2 id="c1">C4 nível 1: contexto</h2>
+<div class="dg"><pre class="mermaid">
+flowchart LR
+U([Usuário do operador]) -->|acessa| YO4
+PERM[Permissionamento - origem do arquivo] -->|deposita arquivo| S3[(Bucket S3 cross-account)]
+subgraph SIS[Sistema de contas]
+YO4[YO4 orquestrador e golden source]
+IG3[IG3 agrupamento]
+XF8[XF8 fluxo de caixa]
+end
+YO4 -->|lê| S3
+IG3 -->|lê| S3
+XF8 -->|lê| S3
+YO4 -->|REST aviso do arquivo| IG3
+YO4 -->|REST aviso do arquivo| XF8
+IG3 -->|REST status agregação| YO4
+XF8 -->|REST status fluxo de caixa| YO4
+</pre></div>
+<p class="note">Premissa: o arquivo chega ao bucket de retorno de permissionamento e o YO4 é quem o detecta. Ajuste se a origem for outra.</p>
+
+<h2 id="c2">C4 nível 2: containers</h2>
+<div class="dg"><pre class="mermaid">
+flowchart TB
+subgraph AWSA[Conta AWS dona do bucket]
+S3[(S3 retorno de permissionamento)]
+KMS[KMS chave do bucket]
+end
+subgraph YO4[YO4]
+API[API de onboarding e status]
+ORQ[Orquestrador e job de reprocesso]
+RED[(Redis lock e status)]
+DB[(Base do YO4 golden source)]
+end
+subgraph IG3[IG3]
+IC[Consumidor do arquivo]
+IK[Consumidor Kafka do repermissionamento]
+D4[(DynamoDB 3004)]
+D1[(DynamoDB 3001)]
+end
+subgraph XF8[XF8]
+XC[Consumidor do arquivo]
+XDB[(Base do XF8)]
+end
+ORQ --> RED
+ORQ --> DB
+ORQ -->|lê arquivo| S3
+IC -->|GetObject| S3
+XC -->|GetObject| S3
+S3 -.-> KMS
+ORQ -->|REST aviso| IC
+ORQ -->|REST aviso| XC
+IC --> D4
+IC --> D1
+XC --> XDB
+IC -->|REST status| API
+XC -->|REST status| API
+ORQ -->|Kafka repermissionamento| IK
+IK --> D1
+IK -->|REST conta| XC
+</pre></div>
+
+<h2 id="f1">Fluxo do onboarding, de ponta a ponta</h2>
+<div class="dg"><pre class="mermaid">
+sequenceDiagram
+autonumber
+participant U as Usuário
+participant Y as YO4
+participant S as Bucket S3
+participant I as IG3
+participant X as XF8
+U->>Y: Primeiro acesso, usuário criado para o operador
+Y->>Y: Adquire lock do operador e cria chave de status
+Y->>I: Cria agrupamento da conta logada
+S-->>Y: Arquivo disponível com tipo ONBOARDING
+Y->>S: Lê o arquivo em streaming
+Y->>Y: Grava contas e define totalContas
+par avisos em paralelo
+Y->>I: REST aviso do arquivo
+and
+Y->>X: REST aviso do arquivo
+end
+par processamento
+I->>S: Lê o arquivo
+I->>I: Upsert na 3004 em lotes de 25 e depois grava a 3001
+I->>Y: REST agregação com contagem e hash
+and
+X->>S: Lê o arquivo
+X->>X: Upsert na base própria
+X->>Y: REST fluxo de caixa com contagem e hash
+end
+Y->>Y: Compara com o golden source e conclui
+U->>Y: Consulta o endpoint de status
+</pre></div>
+<ul>
+<li><strong>Chave de status inicial:</strong> <code>totalContas = -1</code>, onboarding “iniciado” com 1 conta (a conta logada), agregação e fluxo de caixa “aguardando”.</li>
+<li><strong>Quando o YO4 consome o arquivo</strong>, ele sabe quantas contas serão salvas e troca o <code>-1</code> pelo total. Esse total segue nos avisos a IG3 e XF8.</li>
+<li><strong>IG3 grava a 3004 primeiro</strong> e agrupa na 3001 de uma só vez, com a modelagem atual. Isso elimina o padrão que gerava O(N²) escritas.</li>
+</ul>
+
+<h2 id="f2">Estados e convergência</h2>
+<div class="dg"><pre class="mermaid">
+stateDiagram-v2
+[*] --> INICIADO
+INICIADO --> PROCESSANDO: arquivo lido e avisos enviados
+PROCESSANDO --> CONCLUIDO: IG3 e XF8 conferem contagem e hash
+PROCESSANDO --> ERRO: falha, timeout ou divergência
+ERRO --> PROCESSANDO: retentativa com backoff
+CONCLUIDO --> [*]
+</pre></div>
+<ul>
+<li><strong>Sem rollback.</strong> A escrita é um upsert pela chave da conta, então reprocessar a mesma <code>idExecucao</code> não duplica nada.</li>
+<li><strong>Retentativa:</strong> o YO4 reenvia o mesmo aviso com backoff. Um job periódico volta a processar os onboardings em ERRO até concluírem e alerta ao passar de um limite.</li>
+<li><strong>Divergência</strong> (contagem ou hash diferente) é tratada como erro da etapa e reprocessada.</li>
+</ul>
+
+<h2 id="f3">Fluxo do repermissionamento</h2>
+<div class="dg"><pre class="mermaid">
+sequenceDiagram
+autonumber
+participant Y as YO4
+participant S as Bucket S3
+participant K as Kafka
+participant I as IG3
+participant X as XF8
+Y->>Y: Identifica tipo REPERMISSIONAMENTO e valida a exclusão do operador
+Y->>S: Lê o arquivo
+loop cada conta nova ou revogada
+Y->>K: Evento da conta
+K->>I: Consome
+I->>I: Adiciona ou remove na 3001 com a mesma versão
+I->>X: REST da conta
+end
+Note over Y,X: Chave própria, sem report de status
+</pre></div>
+
+<h2 id="bk">Bucket cross-account</h2>
+<p class="note">Premissa: IG3 e XF8 rodam em contas diferentes da dona do bucket. Os dois lados precisam permitir o acesso.</p>
+<ul>
+<li><strong>Bucket policy</strong> na conta dona: permitir as roles de IG3 e XF8 (e do YO4, se estiver em outra conta) com <code>s3:GetObject</code>, <code>s3:GetObjectVersion</code> e <code>s3:ListBucket</code>, cobrindo <code>bucket</code> e <code>bucket/*</code>.</li>
+<li><strong>Policy IAM</strong> na role de cada consumidor, com as mesmas ações nesse bucket.</li>
+<li><strong>KMS:</strong> se houver SSE-KMS com chave própria, a key policy libera as roles e elas recebem <code>kms:Decrypt</code>. A chave <code>aws/s3</code> não funciona entre contas.</li>
+<li><strong>Boas práticas:</strong> liberar roles específicas, não a conta inteira; manter ACLs desabilitadas (Bucket owner enforced); manter Block Public Access ligado; revisar SCPs; ligar versionamento e ler por <code>versionId</code>.</li>
+</ul>
+
+<h2 id="rg">Regras de negócio</h2>
+<ol class="r">
+<li><strong>Início:</strong> o onboarding só começa quando um usuário é criado para o operador. Operador e usuário são 1:1. Se o usuário já existe, não há onboarding.</li>
+<li><strong>Tipo do arquivo:</strong> o YO4 distingue onboarding de repermissionamento por um manifesto com <code>tipo</code>, <code>idOperador</code>, <code>idExecucao</code> e <code>versaoSchema</code>.</li>
+<li><strong>Um processo por operador:</strong> o repermissionamento só inicia se não houver onboarding pendente (status diferente de CONCLUIDO) nem outro repermissionamento em execução. O controle usa <code>lock:operador:{id}</code> com SET NX e TTL.</li>
+<li><strong>Contas:</strong> existem apenas contas novas e revogadas. Não há mais “mantidas”.</li>
+<li><strong>Golden source:</strong> as contas do YO4 devem existir em IG3 e XF8. A conclusão exige contagem e hash dos ids iguais.</li>
+<li><strong>Idempotência:</strong> upsert por conta e notificações com <code>idExecucao</code>. O YO4 descarta notificações de execuções antigas.</li>
+<li><strong>Etapas:</strong> o YO4 reporta Onboarding, o IG3 reporta Agregacao e o XF8 reporta FluxoCaixa. A atualização do status é atômica por etapa (hash no Redis).</li>
+<li><strong>Falha:</strong> IG3 ou XF8 com erro deixam o status em ERRO. Sem rollback: reenvio e reprocesso até convergir.</li>
+<li><strong>Repermissionamento:</strong> segue por Kafka, conta a conta, com chave própria e sem report de status. O auto-agrupamento sempre roda e é incremental na 3001, com a mesma versão do agrupamento existente. O IG3 avisa o XF8 por REST.</li>
+<li><strong>Status:</strong> o endpoint de status é do YO4. O onboarding termina quando as três etapas terminam.</li>
+</ol>
+
+<h2 id="ct">Contratos</h2>
+<p>Aviso do arquivo (YO4 para IG3 e XF8):</p>
+<pre class="c">{ "idOperador": "...", "idExecucao": "...", "tipo": "ONBOARDING",
+  "bucket": "...", "key": "...", "versionId": "...",
+  "checksum": "...", "totalContas": 1200 }</pre>
+<p>Status de etapa (IG3 ou XF8 para o YO4):</p>
+<pre class="c">{ "idOperador": "...", "idExecucao": "...",
+  "etapa": "agregacao", "status": "concluido",
+  "quantidadeContas": 1200, "hashIds": "..." }</pre>
+<p>Chave de status no Redis, <code>onboarding:status:{idOperador}</code>, exposta por <code>GET /onboarding/{idOperador}/status</code> no YO4:</p>
+<pre class="c">{ "idExecucao": "...", "totalContas": -1,
+  "onboarding":  { "status": "iniciado",  "quantidadeContas": 1 },
+  "agregacao":   { "status": "aguardando", "quantidadeContas": 0 },
+  "fluxocaixa":  { "status": "aguardando", "quantidadeContas": 0 } }</pre>
+
+<h2 id="pd">Fora do escopo e a calibrar</h2>
+<ul>
+<li><strong>Fase 2, depois:</strong> conferência periódica do repermissionamento, com endpoints de contagem e hash em IG3 e XF8 e um job no YO4.</li>
+<li><strong>Parâmetros a calibrar:</strong> timeout por etapa, número de retentativas, TTL do lock e da chave de status, frequência do job de reprocesso.</li>
+</ul>
+</main>
+
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+</body>
+</html>
